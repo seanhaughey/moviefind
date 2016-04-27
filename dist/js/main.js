@@ -19553,35 +19553,127 @@ var AppConstants = require('../constants/AppConstants');
 
 var AppActions = {
 	searchMovies: function(movie){
-		console.log('Searching for movie ' + movie.title);
 		AppDispatcher.handleViewAction({
 			actionType: AppConstants.SEARCH_MOVIES,
 			movie: movie
-		})
+		});
+	},
+	receiveMovieResults: function(movies){
+		console.log('here are the results '+movies);	
+		AppDispatcher.handleViewAction({
+			actionType: AppConstants.RECEIVE_MOVIE_RESULTS,
+			movies: movies
+		});		
 	}
 }
 
 module.exports = AppActions;
 
-},{"../constants/AppConstants":167,"../dispatcher/AppDispatcher":168}],165:[function(require,module,exports){
+},{"../constants/AppConstants":169,"../dispatcher/AppDispatcher":170}],165:[function(require,module,exports){
 var React = require('react');
 var AppActions = require('../actions/AppActions');
 var AppStore = require('../stores/AppStore');
 var SearchForm = require('./SearchForm.js')
+var MovieResults = require('./MovieResults.js')
+
+function getAppState(){
+	return {
+		movies: AppStore.getMovieResults()
+	};
+};
 
 var App = React.createClass({displayName: "App",
+	getInitialState: function(){
+		return getAppState();
+	},
+	componentDidMount: function(){
+		AppStore.addChangeListener(this._onChange);
+	},
+
+	componentWillUnmount: function(){
+		AppStore.removeChangeListener(this._onChange);
+	},
+
 	render: function(){
+		console.log("this.state.movies = "+this.state.movies);
+		if(this.state.movies == ''){
+			var movieResults = '';
+		} else {
+			var movieResults = React.createElement(MovieResults, {movies: this.state.movies})
+		}
 		return (
 			React.createElement("div", null, 
-				React.createElement(SearchForm, null)
+				React.createElement(SearchForm, null), 
+				movieResults
 			)
 		)
+	},
+
+	_onChange: function(){
+		this.setState(getAppState());
 	}
 });
 
 module.exports= App;
 
-},{"../actions/AppActions":164,"../stores/AppStore":170,"./SearchForm.js":166,"react":163}],166:[function(require,module,exports){
+},{"../actions/AppActions":164,"../stores/AppStore":172,"./MovieResults.js":167,"./SearchForm.js":168,"react":163}],166:[function(require,module,exports){
+var React = require('react');
+var AppActions = require('../actions/AppActions');
+var AppStore = require('../stores/AppStore');
+
+var Movie = React.createClass({displayName: "Movie",
+	render: function(){
+		var link = 'http://www.imdb.com/title/'+this.props.movie.imdbID;
+		return (
+			React.createElement("div", {className: "well"}, 
+				React.createElement("div", {className: "row"}, 
+					React.createElement("div", {className: "col-md-4"}, 
+						React.createElement("img", {className: "thumbnail", src: this.props.movie.Poster})
+					), 
+					React.createElement("div", {className: "col-md-8"}, 
+						React.createElement("h4", null, this.props.movie.Title), 
+						React.createElement("ul", {className: "list-group"}, 
+							React.createElement("li", {className: "list-group-item"}, "Year Released: ", this.props.movie.Year), 
+							React.createElement("li", {className: "list-group-item"}, "IMDB ID: ", this.props.movie.imdbID)
+						), 
+						React.createElement("a", {className: "btn btn-primary", href: link}, "View on IMDB")
+					)
+				)
+			)
+		)
+	},
+
+});
+
+module.exports= Movie;
+
+},{"../actions/AppActions":164,"../stores/AppStore":172,"react":163}],167:[function(require,module,exports){
+var React = require('react');
+var AppActions = require('../actions/AppActions');
+var AppStore = require('../stores/AppStore');
+var Movie = require('./Movie.js');
+
+var MovieResults = React.createClass({displayName: "MovieResults",
+	render: function(){
+		return (
+			React.createElement("div", null, 
+				React.createElement("h3", {className: "text-center"}, "Results"), 
+				
+					this.props.movies.map(function(movie, i){
+						return(
+							React.createElement(Movie, {movie: movie, key: i})
+						)
+					})
+				
+			)
+		)
+	},
+
+});
+
+module.exports= MovieResults;
+
+},{"../actions/AppActions":164,"../stores/AppStore":172,"./Movie.js":166,"react":163}],168:[function(require,module,exports){
 var React = require('react');
 var AppActions = require('../actions/AppActions');
 var AppStore = require('../stores/AppStore');
@@ -19614,13 +19706,14 @@ var SearchForm = React.createClass({displayName: "SearchForm",
 
 module.exports= SearchForm;
 
-},{"../actions/AppActions":164,"../stores/AppStore":170,"react":163}],167:[function(require,module,exports){
+},{"../actions/AppActions":164,"../stores/AppStore":172,"react":163}],169:[function(require,module,exports){
 module.exports = {
-	SEARCH_MOVIES: 'SEARCH_MOVIES'
+	SEARCH_MOVIES: 'SEARCH_MOVIES',
+	RECEIVE_MOVIE_RESULTS: 'RECEIVE_MOVIE_RESULTS'
 
 }
 
-},{}],168:[function(require,module,exports){
+},{}],170:[function(require,module,exports){
 var Dispatcher = require('flux').Dispatcher;
 var assign = require('object-assign');
 var AppDispatcher = assign(new Dispatcher(), {
@@ -19635,7 +19728,7 @@ var AppDispatcher = assign(new Dispatcher(), {
 
 module.exports = AppDispatcher;
 
-},{"flux":3,"object-assign":6}],169:[function(require,module,exports){
+},{"flux":3,"object-assign":6}],171:[function(require,module,exports){
 var App = require('./components/App');
 var React = require('react');
 var ReactDOM = require('react-dom');
@@ -19646,7 +19739,7 @@ ReactDOM.render(
 	document.getElementById('app')
 );
 
-},{"./components/App":165,"./utils/appAPI.js":171,"react":163,"react-dom":7}],170:[function(require,module,exports){
+},{"./components/App":165,"./utils/appAPI.js":173,"react":163,"react-dom":7}],172:[function(require,module,exports){
 var AppDispatcher = require('../dispatcher/AppDispatcher');
 var AppConstants = require('../constants/AppConstants');
 var EventEmitter = require('events').EventEmitter;
@@ -19659,6 +19752,12 @@ var _movies = [];
 var _selected = '';
 
 var AppStore = assign({}, EventEmitter.prototype, {
+	setMovieResults: function(movies){
+		_movie = movies;
+	},
+	getMovieResults: function(){
+		return _movies;
+	},
 	emitChange: function(){
 		this.emit(CHANGE_EVENT);
 	},
@@ -19674,7 +19773,15 @@ AppDispatcher.register(function(payload){
 	var action = payload.action;
 
 	switch(action.actionType){
-
+		case AppConstants.SEARCH_MOVIES:
+			console.log('Searching for movie ' + action.movie.title);
+			AppAPI.searchMovies(action.movie);
+			AppStore.emit(CHANGE_EVENT);
+			break;
+		case AppConstants.RECEIVE_MOVIE_RESULTS:
+			AppStore.setMovieResults(action.movies);
+			AppStore.emit(CHANGE_EVENT);
+			break;
 	};
 
 	return true;
@@ -19682,13 +19789,26 @@ AppDispatcher.register(function(payload){
 
 module.exports = AppStore;
 
-},{"../constants/AppConstants":167,"../dispatcher/AppDispatcher":168,"../utils/appAPI.js":171,"events":1,"object-assign":6}],171:[function(require,module,exports){
+},{"../constants/AppConstants":169,"../dispatcher/AppDispatcher":170,"../utils/appAPI.js":173,"events":1,"object-assign":6}],173:[function(require,module,exports){
 var AppActions = require('../actions/AppActions');
 
 module.exports = {
 	searchMovies: function(movie){
-
+		$.ajax({
+			url: 'http://www.omdbapi.com/?s='+movie.title,
+			type: 'GET',
+			dataType: 'json',
+			// cache: false,
+			success: function(data){
+				console.log(data.Search);
+				AppActions.receiveMovieResults(data.Search);
+			}.bind(this),
+			error: function(xhr, status, err){
+				console.log(xhr);
+				alert(err);
+			}.bind(this)
+		});
 	}
 }
 
-},{"../actions/AppActions":164}]},{},[169]);
+},{"../actions/AppActions":164}]},{},[171]);
